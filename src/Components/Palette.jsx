@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { getFirestore, collection, getDocs, addDoc, deleteDoc, doc } from 'firebase/firestore';
 
 function Palette({ showPalette }) {
   const [selectedColor, setSelectedColor] = useState('');
@@ -7,30 +8,56 @@ function Palette({ showPalette }) {
   const [newColor, setNewColor] = useState('#ffffff');
   const [newColorText, setNewColorText] = useState('');
 
-  const addColorToPalette = () => {
+  const addColorToPalette = async () => {
     setPalette([...palette, { color: newColor, text: newColorText }]);
-    // setNewColor('#ffffff'); // この行を削除
+
+    // Firestore にデータを追加
+    try {
+      const db = getFirestore(); // Firestore データベースを取得
+      const colorsCollection = collection(db, 'colors'); // 'colors' コレクションを参照
+      await addDoc(colorsCollection, { color: newColor, text: newColorText }); // Firestore に新しいドキュメントを追加
+    } catch (error) {
+      console.error('Error adding document: ', error);
+    }
     setNewColorText('');
   };
 
   const handleSelectColor = (color) => {
-    if (selectedColor === color) {
-      setSelectedColor('');
-    } else {
-      setSelectedColor(color);
+    setSelectedColor(color === selectedColor ? '' : color);
+  };
+
+  const removeColorFromPalette = async (id) => {
+    try {
+      const db = getFirestore();
+      const colorsCollection = collection(db, 'colors');
+      await deleteDoc(doc(colorsCollection, id));
+      const newPalette = palette.filter(item => item.id !== id);
+      setPalette(newPalette);
+    } catch (error) {
+      console.error('Error removing document: ', error);
     }
   };
 
-  const removeColorFromPalette = (index) => {
-    const newPalette = palette.filter((_, i) => i !== index);
-    setPalette(newPalette);
-  };
+  useEffect(() => {
+    // Firestore からデータを取得するロジックを useEffect 内に移動
+    const fetchData = async () => {
+      try {
+        const db = getFirestore();
+        const querySnapshot = await getDocs(collection(db, 'colors'));
+        const fetchedColors = [];
+        querySnapshot.forEach(doc => {
+          const data = doc.data();
+          fetchedColors.push({ id: doc.id, ...data });
+        });
+        setPalette(fetchedColors);
+      } catch (error) {
+        console.error('Error fetching documents: ', error);
+      }
+    };
 
-  const getColorStyle = (color) => ({
-    backgroundColor: color,
-    margin: '0 5px',
-    opacity: selectedColor === color ? '0.5' : '1',
-  });
+    fetchData(); // コンポーネントがマウントされたときに Firestore からデータを取得する
+
+  }, []);
 
   return (
     <div style={{ position: 'fixed', bottom: '10px', right: '10px', display: 'flex' }}>
@@ -85,7 +112,7 @@ function Palette({ showPalette }) {
                     cursor: 'pointer',
                     fontSize: '30px'
                   }}
-                  onClick={() => removeColorFromPalette(index)}
+                  onClick={() => removeColorFromPalette(item.id)}
                 >
                   ×
                 </button>
