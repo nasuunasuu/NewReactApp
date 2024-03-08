@@ -55,7 +55,7 @@ function Palette({ showPalette }) {
       }
     };
 
-    fetchData(); // コンポーネントがマウントされたときに Firestore からデータを取得する
+    fetchData(); 
 
   }, []);
 
